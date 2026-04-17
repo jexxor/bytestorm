@@ -135,9 +135,8 @@ const file_search_proto_rawDesc = "" +
 	"\x04text\x18\x02 \x01(\fR\x04text\"<\n" +
 	"\x0eLookupResponse\x12\x14\n" +
 	"\x05index\x18\x01 \x01(\x03R\x05index\x12\x14\n" +
-	"\x05found\x18\x02 \x01(\bR\x05found2\xa7\x01\n" +
-	"\rSearchService\x12E\n" +
-	"\x06Lookup\x12\x1c.bytestorm.api.LookupRequest\x1a\x1d.bytestorm.api.LookupResponse\x12O\n" +
+	"\x05found\x18\x02 \x01(\bR\x05found2`\n" +
+	"\rSearchService\x12O\n" +
 	"\fStreamSearch\x12\x1c.bytestorm.api.LookupRequest\x1a\x1d.bytestorm.api.LookupResponse(\x010\x01B\x1aZ\x18jexxor/bytestorm/api;apib\x06proto3"
 
 var (
@@ -158,12 +157,10 @@ var file_search_proto_goTypes = []any{
 	(*LookupResponse)(nil), // 1: bytestorm.api.LookupResponse
 }
 var file_search_proto_depIdxs = []int32{
-	0, // 0: bytestorm.api.SearchService.Lookup:input_type -> bytestorm.api.LookupRequest
-	0, // 1: bytestorm.api.SearchService.StreamSearch:input_type -> bytestorm.api.LookupRequest
-	1, // 2: bytestorm.api.SearchService.Lookup:output_type -> bytestorm.api.LookupResponse
-	1, // 3: bytestorm.api.SearchService.StreamSearch:output_type -> bytestorm.api.LookupResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
+	0, // 0: bytestorm.api.SearchService.StreamSearch:input_type -> bytestorm.api.LookupRequest
+	1, // 1: bytestorm.api.SearchService.StreamSearch:output_type -> bytestorm.api.LookupResponse
+	1, // [1:2] is the sub-list for method output_type
+	0, // [0:1] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name

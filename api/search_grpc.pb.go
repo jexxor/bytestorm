@@ -19,7 +19,6 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	SearchService_Lookup_FullMethodName       = "/bytestorm.api.SearchService/Lookup"
 	SearchService_StreamSearch_FullMethodName = "/bytestorm.api.SearchService/StreamSearch"
 )
 
@@ -27,7 +26,6 @@ const (
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SearchServiceClient interface {
-	Lookup(ctx context.Context, in *LookupRequest, opts ...grpc.CallOption) (*LookupResponse, error)
 	StreamSearch(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[LookupRequest, LookupResponse], error)
 }
 
@@ -37,16 +35,6 @@ type searchServiceClient struct {
 
 func NewSearchServiceClient(cc grpc.ClientConnInterface) SearchServiceClient {
 	return &searchServiceClient{cc}
-}
-
-func (c *searchServiceClient) Lookup(ctx context.Context, in *LookupRequest, opts ...grpc.CallOption) (*LookupResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(LookupResponse)
-	err := c.cc.Invoke(ctx, SearchService_Lookup_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 func (c *searchServiceClient) StreamSearch(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[LookupRequest, LookupResponse], error) {
@@ -66,7 +54,6 @@ type SearchService_StreamSearchClient = grpc.BidiStreamingClient[LookupRequest, 
 // All implementations must embed UnimplementedSearchServiceServer
 // for forward compatibility.
 type SearchServiceServer interface {
-	Lookup(context.Context, *LookupRequest) (*LookupResponse, error)
 	StreamSearch(grpc.BidiStreamingServer[LookupRequest, LookupResponse]) error
 	mustEmbedUnimplementedSearchServiceServer()
 }
@@ -78,9 +65,6 @@ type SearchServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSearchServiceServer struct{}
 
-func (UnimplementedSearchServiceServer) Lookup(context.Context, *LookupRequest) (*LookupResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method Lookup not implemented")
-}
 func (UnimplementedSearchServiceServer) StreamSearch(grpc.BidiStreamingServer[LookupRequest, LookupResponse]) error {
 	return status.Error(codes.Unimplemented, "method StreamSearch not implemented")
 }
@@ -105,24 +89,6 @@ func RegisterSearchServiceServer(s grpc.ServiceRegistrar, srv SearchServiceServe
 	s.RegisterService(&SearchService_ServiceDesc, srv)
 }
 
-func _SearchService_Lookup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(LookupRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(SearchServiceServer).Lookup(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: SearchService_Lookup_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(SearchServiceServer).Lookup(ctx, req.(*LookupRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _SearchService_StreamSearch_Handler(srv interface{}, stream grpc.ServerStream) error {
 	return srv.(SearchServiceServer).StreamSearch(&grpc.GenericServerStream[LookupRequest, LookupResponse]{ServerStream: stream})
 }
@@ -136,12 +102,7 @@ type SearchService_StreamSearchServer = grpc.BidiStreamingServer[LookupRequest, 
 var SearchService_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "bytestorm.api.SearchService",
 	HandlerType: (*SearchServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
-		{
-			MethodName: "Lookup",
-			Handler:    _SearchService_Lookup_Handler,
-		},
-	},
+	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "StreamSearch",

@@ -15,6 +15,5 @@ message LookupResponse {
 }
 
 service SearchService {
-    rpc Lookup (LookupRequest) returns (LookupResponse);
     rpc StreamSearch (stream LookupRequest) returns (stream LookupResponse);
 }

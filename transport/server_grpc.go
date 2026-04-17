@@ -25,7 +25,6 @@ import (
 const (
 	engineHeader            = "X-ByteStorm-Engine"
 	sessionHeader           = "x-bytestorm-session-id"
-	stopTimeout             = 5 * time.Second
 	streamChunkPoolCapacity = 64 << 10
 	streamChunkPoolMaxCap   = 16 << 20
 )
@@ -54,31 +53,6 @@ func NewSearchHandler(svc *core.SearchService, summaryWriter ...infra.StreamSumm
 	}
 
 	return h
-}
-
-func (h *SearchHandler) Lookup(ctx context.Context, req *api.LookupRequest) (*api.LookupResponse, error) {
-	if req == nil {
-		return nil, status.Error(codes.InvalidArgument, "request is required")
-	}
-
-	engineID := resolveEngineID(ctx)
-
-	indices, err := h.svc.Lookup(ctx, req.GetText(), req.GetPattern(), engineID)
-	if err != nil {
-		return nil, mapLookupError(err)
-	}
-
-	resp := &api.LookupResponse{
-		Index: -1,
-		Found: false,
-	}
-
-	if len(indices) > 0 {
-		resp.Index = indices[0]
-		resp.Found = true
-	}
-
-	return resp, nil
 }
 
 func (h *SearchHandler) StreamSearch(stream api.SearchService_StreamSearchServer) error {
@@ -290,6 +264,8 @@ func NewGRPCServer(host string, port int, svc *core.SearchService, summaryWriter
 }
 
 func (s *GRPCServer) Start(ctx context.Context) error {
+	_ = ctx
+
 	listener, err := net.Listen("tcp", s.addr)
 	if err != nil {
 		return err
@@ -298,30 +274,12 @@ func (s *GRPCServer) Start(ctx context.Context) error {
 	s.listener = listener
 	zap.S().Infof("gRPC server listening on %s", s.addr)
 
-	errCh := make(chan error, 1)
-	go func() {
-		err := s.grpcServer.Serve(listener)
-		if err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-			errCh <- err
-			return
-		}
-		close(errCh)
-	}()
-
-	select {
-	case err, ok := <-errCh:
-		if !ok {
-			return nil
-		}
+	err = s.grpcServer.Serve(listener)
+	if err != nil && !errors.Is(err, grpc.ErrServerStopped) {
 		return err
-	case <-ctx.Done():
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), stopTimeout)
-		defer cancel()
-		if stopErr := s.Stop(shutdownCtx); stopErr != nil {
-			return stopErr
-		}
-		return nil
 	}
+
+	return nil
 }
 
 func (s *GRPCServer) Stop(ctx context.Context) error {

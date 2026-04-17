@@ -2,13 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
-	"fmt"
-	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"jexxor/bytestorm/core"
@@ -18,6 +12,8 @@ import (
 	"go.uber.org/zap"
 )
 
+const ydbLifecycleTimeout = 10 * time.Second
+
 func main() {
 	infra.SetupLog()
 	defer zap.S().Sync()
@@ -26,55 +22,59 @@ func main() {
 	flag.Parse()
 	cfg := infra.LoadConfig(*configPath)
 
-	startupCtx, startupCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer startupCancel()
+	startupCtx, cancelStartup := context.WithTimeout(context.Background(), ydbLifecycleTimeout)
+	defer cancelStartup()
 
 	ydbClient, err := infra.NewYDBClient(startupCtx, cfg.YDB.DSN, cfg.YDB.Table)
 	if err != nil {
 		zap.S().Fatalf("Failed to initialize YDB client: %v", err)
 	}
+	defer func() {
+		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), ydbLifecycleTimeout)
+		defer cancelShutdown()
+
+		if closeErr := ydbClient.Close(shutdownCtx); closeErr != nil {
+			zap.S().Warnf("Failed to close YDB client cleanly: %v", closeErr)
+		}
+	}()
+
+	svc := newSearchService(cfg.Engine.ResultBufferCap)
+
+	launcher := transport.NewLauncher(
+		transport.NewGRPCServer(cfg.Server.Host, cfg.Server.Port, svc, ydbClient),
+		transport.NewMetricsServer(cfg.Metrics.Host, cfg.Metrics.Port),
+	)
+
+	if err := launcher.Run(context.Background()); err != nil {
+		zap.S().Fatalf("Launcher stopped with error: %v", err)
+	}
+}
+
+func newSearchService(resultBufferCap int) *core.SearchService {
+	simdEnabled := core.SIMDEnabled()
+	infra.SetSIMDEnabled(simdEnabled)
+
+	if !simdEnabled {
+		zap.S().Warn("!!! ATTENTION !!! RUNNING ON ANCIENT HARDWARE. AVX2 NOT FOUND.")
+		zap.S().Warn("SIMD ENGINE WILL FALLBACK TO SCALAR/KMP MODE. PERFORMANCE MAY DEGRADE.")
+	}
 
 	svc := core.NewSearchService(core.KMPEngineID)
 	for _, engine := range []core.Engine{
 		core.NewKMPEngine(),
-		core.NewSIMDEngine(cfg.Engine.ResultBufferCap),
+		newSIMDEngineForHost(resultBufferCap, simdEnabled),
 		core.NewStdlibEngine(),
 	} {
 		svc.RegisterEngine(engine)
 	}
 
-	server := transport.NewGRPCServer(cfg.Server.Host, cfg.Server.Port, svc, ydbClient)
+	return svc
+}
 
-	metricsAddr := fmt.Sprintf("%s:%d", cfg.Metrics.Host, cfg.Metrics.Port)
-	metricsServer := infra.NewMetricsServer(metricsAddr)
-	go func() {
-		if serveErr := metricsServer.ListenAndServe(); serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
-			zap.S().Fatalf("Failed to start metrics server: %v", serveErr)
-		}
-	}()
-	zap.S().Infof("Metrics server listening on %s", metricsAddr)
-
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	runErr := server.Start(ctx)
-
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer shutdownCancel()
-
-	if err := infra.FlushMetrics(); err != nil {
-		zap.S().Warnf("Failed to gather metrics on shutdown: %v", err)
+func newSIMDEngineForHost(resultBufferCap int, simdEnabled bool) core.Engine {
+	if simdEnabled {
+		return core.NewSIMDEngine(resultBufferCap)
 	}
 
-	if err := metricsServer.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		zap.S().Warnf("Failed to stop metrics server cleanly: %v", err)
-	}
-
-	if err := ydbClient.Close(shutdownCtx); err != nil {
-		zap.S().Warnf("Failed to close YDB client cleanly: %v", err)
-	}
-
-	if runErr != nil {
-		zap.S().Fatalf("Failed to start gRPC server: %v", runErr)
-	}
+	return core.NewSIMDFallbackEngine(core.NewKMPEngine())
 }
