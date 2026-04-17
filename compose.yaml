@@ -1,0 +1,67 @@
+services:
+  bytestorm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: bytestorm:local
+    environment:
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      METRICS_HOST: 0.0.0.0
+      METRICS_PORT: 9090
+      YDB_DSN: grpc://ydb:2136/local
+      YDB_TABLE: /local/bytestorm_stream_summary
+    depends_on:
+      ydb:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+
+  ydb:
+    image: ydbplatform/local-ydb:latest
+    hostname: ydb
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          if command -v curl >/dev/null 2>&1; then
+            curl -fsS http://127.0.0.1:8765/ >/dev/null;
+          elif command -v wget >/dev/null 2>&1; then
+            wget -q -O - http://127.0.0.1:8765/ >/dev/null;
+          else
+            exit 1;
+          fi
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    ports:
+      - "2136:2136"
+      - "8765:8765"
+
+  prometheus:
+    image: prom/prometheus:latest
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - bytestorm
+    ports:
+      - "9091:9090"
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+volumes:
+  grafana-data:

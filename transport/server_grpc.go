@@ -1,15 +1,19 @@
 package transport
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"math"
+	"io"
 	"net"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"jexxor/bytestorm/api"
 	"jexxor/bytestorm/core"
+	"jexxor/bytestorm/infra"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -19,17 +23,37 @@ import (
 )
 
 const (
-	engineHeader = "X-ByteStorm-Engine"
-	stopTimeout  = 5 * time.Second
+	engineHeader            = "X-ByteStorm-Engine"
+	sessionHeader           = "x-bytestorm-session-id"
+	stopTimeout             = 5 * time.Second
+	streamChunkPoolCapacity = 64 << 10
+	streamChunkPoolMaxCap   = 16 << 20
 )
+
+var streamSessionSeq uint64
 
 type SearchHandler struct {
 	api.UnimplementedSearchServiceServer
-	svc *core.SearchService
+	svc           *core.SearchService
+	chunkPool     sync.Pool
+	summaryWriter infra.StreamSummaryWriter
 }
 
-func NewSearchHandler(svc *core.SearchService) *SearchHandler {
-	return &SearchHandler{svc: svc}
+func NewSearchHandler(svc *core.SearchService, summaryWriter ...infra.StreamSummaryWriter) *SearchHandler {
+	var writer infra.StreamSummaryWriter
+	if len(summaryWriter) > 0 {
+		writer = summaryWriter[0]
+	}
+
+	h := &SearchHandler{
+		svc:           svc,
+		summaryWriter: writer,
+	}
+	h.chunkPool.New = func() any {
+		return make([]byte, 0, streamChunkPoolCapacity)
+	}
+
+	return h
 }
 
 func (h *SearchHandler) Lookup(ctx context.Context, req *api.LookupRequest) (*api.LookupResponse, error) {
@@ -50,15 +74,158 @@ func (h *SearchHandler) Lookup(ctx context.Context, req *api.LookupRequest) (*ap
 	}
 
 	if len(indices) > 0 {
-		if indices[0] > math.MaxInt32 {
-			return nil, status.Error(codes.OutOfRange, "match index exceeds int32 range")
-		}
-
-		resp.Index = int32(indices[0])
+		resp.Index = indices[0]
 		resp.Found = true
 	}
 
 	return resp, nil
+}
+
+func (h *SearchHandler) StreamSearch(stream api.SearchService_StreamSearchServer) error {
+	ctx := stream.Context()
+	engineID := resolveEngineID(ctx)
+	if engineID == "" {
+		engineID = core.SIMDEngineID
+	}
+	sessionID := resolveSessionID(ctx)
+
+	var pattern []byte
+	var tail []byte
+	var processed int64
+	var streamMatchCount int64
+
+	for {
+		req, err := stream.Recv()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return h.persistStreamSummary(ctx, sessionID, pattern, streamMatchCount)
+			}
+			return err
+		}
+
+		if req == nil {
+			continue
+		}
+
+		incomingPattern := req.GetPattern()
+		switch {
+		case len(incomingPattern) > 0 && len(pattern) == 0:
+			pattern = append([]byte(nil), incomingPattern...)
+		case len(incomingPattern) > 0 && !bytes.Equal(pattern, incomingPattern):
+			return status.Error(codes.InvalidArgument, "pattern must remain constant throughout StreamSearch")
+		case len(pattern) == 0:
+			return status.Error(codes.InvalidArgument, "pattern is required in the first streamed request")
+		}
+
+		text := req.GetText()
+		if len(text) == 0 {
+			continue
+		}
+
+		overlapLen := len(tail)
+		chunk := h.acquireChunkBuffer(overlapLen + len(text))
+		copy(chunk, tail)
+		copy(chunk[overlapLen:], text)
+
+		searchStart := time.Now()
+		matches, searchErr := h.svc.Lookup(ctx, chunk, pattern, engineID)
+		searchLatency := time.Since(searchStart)
+		if searchErr != nil {
+			h.releaseChunkBuffer(chunk)
+			return mapLookupError(searchErr)
+		}
+
+		baseOffset := processed - int64(overlapLen)
+		minNewStart := processed - int64(len(pattern)) + 1
+		if minNewStart < 0 {
+			minNewStart = 0
+		}
+
+		chunkMatchCount := 0
+		for _, idx := range matches {
+			absolute := baseOffset + idx
+			if absolute < minNewStart {
+				continue
+			}
+
+			if sendErr := stream.Send(&api.LookupResponse{
+				Index: absolute,
+				Found: true,
+			}); sendErr != nil {
+				h.releaseChunkBuffer(chunk)
+				return sendErr
+			}
+
+			chunkMatchCount++
+		}
+
+		streamMatchCount += int64(chunkMatchCount)
+		if engineID == core.SIMDEngineID {
+			infra.ObserveSIMDChunk(len(chunk), chunkMatchCount, searchLatency)
+		}
+
+		processed += int64(len(text))
+
+		tailLen := len(pattern) - 1
+		if tailLen > 0 {
+			if tailLen > len(chunk) {
+				tailLen = len(chunk)
+			}
+			if cap(tail) < tailLen {
+				tail = make([]byte, tailLen)
+			} else {
+				tail = tail[:tailLen]
+			}
+			copy(tail, chunk[len(chunk)-tailLen:])
+		} else {
+			tail = tail[:0]
+		}
+
+		h.releaseChunkBuffer(chunk)
+	}
+}
+
+func (h *SearchHandler) persistStreamSummary(ctx context.Context, sessionID string, pattern []byte, matchCount int64) error {
+	if h.summaryWriter == nil || !h.summaryWriter.Enabled() || len(pattern) == 0 {
+		return nil
+	}
+
+	err := h.summaryWriter.BulkUpsertStreamSummary(ctx, infra.StreamSummary{
+		SessionID:  sessionID,
+		Timestamp:  time.Now().UTC(),
+		Pattern:    append([]byte(nil), pattern...),
+		MatchCount: matchCount,
+	})
+	if err != nil {
+		return status.Errorf(codes.Internal, "failed to persist stream summary: %v", err)
+	}
+
+	return nil
+}
+
+func (h *SearchHandler) acquireChunkBuffer(size int) []byte {
+	if size <= 0 {
+		return nil
+	}
+
+	raw := h.chunkPool.Get()
+	buf, _ := raw.([]byte)
+	if cap(buf) < size {
+		return make([]byte, size)
+	}
+
+	return buf[:size]
+}
+
+func (h *SearchHandler) releaseChunkBuffer(buf []byte) {
+	if buf == nil {
+		return
+	}
+	if cap(buf) > streamChunkPoolMaxCap {
+		return
+	}
+
+	h.chunkPool.Put(buf[:0])
 }
 
 func resolveEngineID(ctx context.Context) string {
@@ -73,6 +240,19 @@ func resolveEngineID(ctx context.Context) string {
 	}
 
 	return engines[0]
+}
+
+func resolveSessionID(ctx context.Context) string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if ok {
+		sessions := md.Get(sessionHeader)
+		if len(sessions) > 0 && sessions[0] != "" {
+			return sessions[0]
+		}
+	}
+
+	seq := atomic.AddUint64(&streamSessionSeq, 1)
+	return fmt.Sprintf("stream-%d-%d", time.Now().UTC().UnixNano(), seq)
 }
 
 func mapLookupError(err error) error {
@@ -98,10 +278,10 @@ type GRPCServer struct {
 	listener   net.Listener
 }
 
-func NewGRPCServer(host string, port int, svc *core.SearchService) *GRPCServer {
+func NewGRPCServer(host string, port int, svc *core.SearchService, summaryWriter ...infra.StreamSummaryWriter) *GRPCServer {
 	addr := fmt.Sprintf("%s:%d", host, port)
 	grpcServer := grpc.NewServer()
-	api.RegisterSearchServiceServer(grpcServer, NewSearchHandler(svc))
+	api.RegisterSearchServiceServer(grpcServer, NewSearchHandler(svc, summaryWriter...))
 
 	return &GRPCServer{
 		addr:       addr,

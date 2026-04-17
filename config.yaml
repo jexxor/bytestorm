@@ -1,3 +1,14 @@
 server:
   host: "127.0.0.1"
   port: 8080
+
+metrics:
+  host: "0.0.0.0"
+  port: 9090
+
+ydb:
+  dsn: ""
+  table: "/local/bytestorm_stream_summary"
+
+engine:
+  result_buffer_cap: 65536
