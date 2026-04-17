@@ -78,6 +78,17 @@ func BenchmarkParallelSearch(b *testing.B) {
 
 	b.SetBytes(int64(len(data)))
 	b.ReportAllocs()
+
+	// Warmup run reduces one-time startup noise before timed iterations.
+	warmupMatches, err := svc.ParallelSearch(ctx, path, pattern)
+	if err != nil {
+		b.Fatalf("warmup ParallelSearch returned error: %v", err)
+	}
+	benchmarkResult += int64(len(warmupMatches))
+	if len(warmupMatches) > 0 {
+		benchmarkResult += warmupMatches[0]
+	}
+
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {

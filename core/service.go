@@ -22,7 +22,6 @@ type parallelChunk struct {
 type parallelChunkResult struct {
 	chunkID int
 	matches []int64
-	err     error
 }
 
 type SearchService struct {
@@ -109,27 +108,51 @@ func (s *SearchService) parallelSearchMapped(ctx context.Context, data []byte, p
 	if len(chunks) == 0 {
 		return nil, nil
 	}
+	if workers > len(chunks) {
+		workers = len(chunks)
+	}
 
-	jobs := make(chan parallelChunk, workers*2)
-	results := make(chan parallelChunkResult, workers*2)
-	dispatchErrCh := make(chan error, 1)
+	runCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	workerResults := make([][]parallelChunkResult, workers)
+
+	var workerErr error
+	var workerErrMu sync.Mutex
+	setWorkerErr := func(err error) {
+		if err == nil {
+			return
+		}
+
+		workerErrMu.Lock()
+		if workerErr == nil {
+			workerErr = err
+		}
+		workerErrMu.Unlock()
+	}
 
 	var wg sync.WaitGroup
-	for i := 0; i < workers; i++ {
+	for workerID := 0; workerID < workers; workerID++ {
+		workerID := workerID
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
 			engine := NewSIMDEngine(0)
-			for chunk := range jobs {
-				if err := ctx.Err(); err != nil {
-					results <- parallelChunkResult{err: err}
+			localResults := make([]parallelChunkResult, 0, (len(chunks)+workers-1)/workers)
+
+			for chunkIndex := workerID; chunkIndex < len(chunks); chunkIndex += workers {
+				if err := runCtx.Err(); err != nil {
+					setWorkerErr(err)
 					return
 				}
 
-				local, err := engine.Search(ctx, data[chunk.start:chunk.scanEnd], pattern)
+				chunk := chunks[chunkIndex]
+
+				local, err := engine.Search(runCtx, data[chunk.start:chunk.scanEnd], pattern)
 				if err != nil {
-					results <- parallelChunkResult{err: err}
+					setWorkerErr(err)
+					cancel()
 					return
 				}
 
@@ -148,52 +171,31 @@ func (s *SearchService) parallelSearchMapped(ctx context.Context, data []byte, p
 				}
 
 				if len(converted) > 0 {
-					results <- parallelChunkResult{chunkID: chunk.id, matches: converted}
+					localResults = append(localResults, parallelChunkResult{chunkID: chunk.id, matches: converted})
 				}
 			}
+
+			workerResults[workerID] = localResults
 		}()
 	}
 
-	go func() {
-		defer close(jobs)
+	wg.Wait()
 
-		for _, chunk := range chunks {
-			select {
-			case <-ctx.Done():
-				dispatchErrCh <- ctx.Err()
-				return
-			case jobs <- chunk:
-			}
-		}
-
-		dispatchErrCh <- nil
-	}()
-
-	go func() {
-		wg.Wait()
-		close(results)
-	}()
-
-	ordered := make([][]int64, len(chunks))
-	var workerErr error
-
-	for result := range results {
-		if result.err != nil {
-			if workerErr == nil {
-				workerErr = result.err
-			}
-			continue
-		}
-
-		ordered[result.chunkID] = append(ordered[result.chunkID], result.matches...)
-	}
-
-	dispatchErr := <-dispatchErrCh
 	if workerErr != nil {
+		if errors.Is(workerErr, context.Canceled) && ctx.Err() == nil {
+			return nil, context.Canceled
+		}
 		return nil, workerErr
 	}
-	if dispatchErr != nil {
-		return nil, dispatchErr
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	ordered := make([][]int64, len(chunks))
+	for _, local := range workerResults {
+		for _, result := range local {
+			ordered[result.chunkID] = append(ordered[result.chunkID], result.matches...)
+		}
 	}
 
 	total := 0

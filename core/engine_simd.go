@@ -2,16 +2,28 @@ package core
 
 import (
 	"context"
+	"runtime"
 	"sync"
+
+	"golang.org/x/sys/cpu"
 )
 
 const SIMDEngineID = "simd"
 
 const defaultSIMDResultBufferCap = 64 << 10
+const simdSmallInputThreshold = 16 << 10
+
+var simdAvailable = runtime.GOARCH == "amd64" && cpu.X86.HasAVX2
 
 type SIMDEngine struct {
 	resultPool sync.Pool
 	maxResults int
+	fallback   Engine
+	smallInput Engine
+}
+
+func SIMDEnabled() bool {
+	return simdAvailable
 }
 
 func NewSIMDEngine(bufferCap int) *SIMDEngine {
@@ -21,6 +33,8 @@ func NewSIMDEngine(bufferCap int) *SIMDEngine {
 
 	engine := &SIMDEngine{
 		maxResults: bufferCap,
+		fallback:   NewKMPEngine(),
+		smallInput: NewStdlibEngine(),
 	}
 
 	engine.resultPool.New = func() any {
@@ -35,6 +49,13 @@ func (e *SIMDEngine) GetID() string {
 }
 
 func (e *SIMDEngine) Search(ctx context.Context, data []byte, pattern []byte) ([]int64, error) {
+	if len(data) < simdSmallInputThreshold {
+		return e.smallInput.Search(ctx, data, pattern)
+	}
+
+	if !SIMDEnabled() {
+		return e.fallback.Search(ctx, data, pattern)
+	}
 
 	pLen := len(pattern)
 	dLen := len(data)

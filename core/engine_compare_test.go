@@ -13,6 +13,7 @@ type engineFactory func() Engine
 
 func allEngineFactories() map[string]engineFactory {
 	return map[string]engineFactory{
+		ScalarEngineID: func() Engine { return NewScalarEngine() },
 		KMPEngineID:    func() Engine { return NewKMPEngine() },
 		SIMDEngineID:   func() Engine { return NewSIMDEngine(0) },
 		StdlibEngineID: func() Engine { return NewStdlibEngine() },
@@ -111,12 +112,13 @@ func TestSearchEnginesSameCases(t *testing.T) {
 
 func BenchmarkEngineComparison(b *testing.B) {
 	engines := []Engine{
+		NewScalarEngine(),
 		NewKMPEngine(),
 		NewSIMDEngine(0),
 		NewStdlibEngine(),
 	}
 	pattern := []byte("needle")
-	sizes := []int{4 << 10, 64 << 10, 1 << 20}
+	sizes := []int{4 << 10, 64 << 10, 1 << 20, 16 << 20}
 
 	for _, size := range sizes {
 		size := size
@@ -127,6 +129,17 @@ func BenchmarkEngineComparison(b *testing.B) {
 			b.Run(fmt.Sprintf("%s/size=%d", engine.GetID(), size), func(b *testing.B) {
 				ctx := context.Background()
 				b.ReportAllocs()
+
+				// Warmup run keeps cache and code paths hot before timing.
+				warmupMatches, err := engine.Search(ctx, data, pattern)
+				if err != nil {
+					b.Fatalf("warmup Search returned error: %v", err)
+				}
+				benchmarkResult += int64(len(warmupMatches))
+				if len(warmupMatches) > 0 {
+					benchmarkResult += int64(warmupMatches[0])
+				}
+
 				b.ResetTimer()
 
 				for i := 0; i < b.N; i++ {
