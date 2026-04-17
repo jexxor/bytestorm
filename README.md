@@ -35,9 +35,9 @@ Bytestorm is a high-throughput byte-pattern search service for large streams and
 
 Benchmarks were re-run at the end with fresh data files:
 
-- bench_engine_final.txt
-- bench_parallel_final_default.txt
-- bench_parallel_final_pcore6.txt
+- [bench_engine_final.txt](docs/bench_results/bench_engine_final.txt)
+- [bench_parallel_final_default.txt](docs/bench_results/bench_parallel_final_default.txt)
+- [bench_parallel_final_pcore6.txt](docs/bench_results/bench_parallel_final_pcore6.txt)
 
 ### Engine ns/op
 
