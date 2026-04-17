@@ -1,0 +1,9 @@
+goos: linux
+goarch: amd64
+pkg: jexxor/bytestorm/core
+cpu: 13th Gen Intel(R) Core(TM) i5-13500H
+BenchmarkParallelSearch-16    	     368	   3310865 ns/op	20269.28 MB/s	 2647586 B/op	     130 allocs/op
+BenchmarkParallelSearch-16    	     388	   3665078 ns/op	18310.35 MB/s	 2647277 B/op	     130 allocs/op
+BenchmarkParallelSearch-16    	     259	   4600466 ns/op	14587.40 MB/s	 2646445 B/op	     130 allocs/op
+PASS
+ok  	jexxor/bytestorm/core	5.427s

@@ -1,0 +1,54 @@
+goos: linux
+goarch: amd64
+pkg: jexxor/bytestorm/core
+cpu: 13th Gen Intel(R) Core(TM) i5-13500H
+BenchmarkEngineComparison/scalar/size=4096-16         	  381981	      3080 ns/op	       8 B/op	       1 allocs/op
+BenchmarkEngineComparison/scalar/size=4096-16         	  389302	      3066 ns/op	       8 B/op	       1 allocs/op
+BenchmarkEngineComparison/scalar/size=4096-16         	  387488	      3067 ns/op	       8 B/op	       1 allocs/op
+BenchmarkEngineComparison/kmp/size=4096-16            	  256765	      4660 ns/op	      16 B/op	       2 allocs/op
+BenchmarkEngineComparison/kmp/size=4096-16            	  215437	      4655 ns/op	      16 B/op	       2 allocs/op
+BenchmarkEngineComparison/kmp/size=4096-16            	  257636	      4659 ns/op	      16 B/op	       2 allocs/op
+BenchmarkEngineComparison/simd/size=4096-16           	 5720668	       205.3 ns/op	       8 B/op	       1 allocs/op
+BenchmarkEngineComparison/simd/size=4096-16           	 5745514	       204.1 ns/op	       8 B/op	       1 allocs/op
+BenchmarkEngineComparison/simd/size=4096-16           	 5903028	       204.7 ns/op	       8 B/op	       1 allocs/op
+BenchmarkEngineComparison/stdlib/size=4096-16         	 5813774	       202.6 ns/op	       8 B/op	       1 allocs/op
+BenchmarkEngineComparison/stdlib/size=4096-16         	 5866741	       201.9 ns/op	       8 B/op	       1 allocs/op
+BenchmarkEngineComparison/stdlib/size=4096-16         	 5909578	       202.4 ns/op	       8 B/op	       1 allocs/op
+BenchmarkEngineComparison/scalar/size=65536-16        	   22960	     51970 ns/op	     248 B/op	       5 allocs/op
+BenchmarkEngineComparison/scalar/size=65536-16        	   23395	     52585 ns/op	     248 B/op	       5 allocs/op
+BenchmarkEngineComparison/scalar/size=65536-16        	   22975	     51602 ns/op	     248 B/op	       5 allocs/op
+BenchmarkEngineComparison/kmp/size=65536-16           	   16053	     74634 ns/op	     200 B/op	       3 allocs/op
+BenchmarkEngineComparison/kmp/size=65536-16           	   16069	     75126 ns/op	     200 B/op	       3 allocs/op
+BenchmarkEngineComparison/kmp/size=65536-16           	   16110	     74247 ns/op	     200 B/op	       3 allocs/op
+BenchmarkEngineComparison/simd/size=65536-16          	  443398	      2562 ns/op	     152 B/op	       2 allocs/op
+BenchmarkEngineComparison/simd/size=65536-16          	  447290	      2533 ns/op	     152 B/op	       2 allocs/op
+BenchmarkEngineComparison/simd/size=65536-16          	  445219	      2576 ns/op	     152 B/op	       2 allocs/op
+BenchmarkEngineComparison/stdlib/size=65536-16        	  333519	      3582 ns/op	     192 B/op	       2 allocs/op
+BenchmarkEngineComparison/stdlib/size=65536-16        	  304287	      3555 ns/op	     192 B/op	       2 allocs/op
+BenchmarkEngineComparison/stdlib/size=65536-16        	  334633	      3600 ns/op	     192 B/op	       2 allocs/op
+BenchmarkEngineComparison/scalar/size=1048576-16      	    1437	    842392 ns/op	    4088 B/op	       9 allocs/op
+BenchmarkEngineComparison/scalar/size=1048576-16      	    1297	    837496 ns/op	    4088 B/op	       9 allocs/op
+BenchmarkEngineComparison/scalar/size=1048576-16      	    1452	    832027 ns/op	    4088 B/op	       9 allocs/op
+BenchmarkEngineComparison/kmp/size=1048576-16         	    1003	   1191031 ns/op	    4040 B/op	       7 allocs/op
+BenchmarkEngineComparison/kmp/size=1048576-16         	     956	   1191619 ns/op	    4040 B/op	       7 allocs/op
+BenchmarkEngineComparison/kmp/size=1048576-16         	    1002	   1192053 ns/op	    4040 B/op	       7 allocs/op
+BenchmarkEngineComparison/simd/size=1048576-16        	   29965	     39211 ns/op	    2074 B/op	       2 allocs/op
+BenchmarkEngineComparison/simd/size=1048576-16        	   30080	     38931 ns/op	    2074 B/op	       2 allocs/op
+BenchmarkEngineComparison/simd/size=1048576-16        	   30667	     39262 ns/op	    2074 B/op	       2 allocs/op
+BenchmarkEngineComparison/stdlib/size=1048576-16      	   19810	     57205 ns/op	    4032 B/op	       6 allocs/op
+BenchmarkEngineComparison/stdlib/size=1048576-16      	   20137	     57604 ns/op	    4032 B/op	       6 allocs/op
+BenchmarkEngineComparison/stdlib/size=1048576-16      	   20673	     56955 ns/op	    4032 B/op	       6 allocs/op
+BenchmarkEngineComparison/scalar/size=16777216-16     	      86	  13747963 ns/op	  128248 B/op	      16 allocs/op
+BenchmarkEngineComparison/scalar/size=16777216-16     	      87	  13657108 ns/op	  128248 B/op	      16 allocs/op
+BenchmarkEngineComparison/scalar/size=16777216-16     	      87	  13788185 ns/op	  128248 B/op	      16 allocs/op
+BenchmarkEngineComparison/kmp/size=16777216-16        	      61	  19238811 ns/op	  128200 B/op	      14 allocs/op
+BenchmarkEngineComparison/kmp/size=16777216-16        	      62	  19247910 ns/op	  128200 B/op	      14 allocs/op
+BenchmarkEngineComparison/kmp/size=16777216-16        	      61	  19216114 ns/op	  128200 B/op	      14 allocs/op
+BenchmarkEngineComparison/simd/size=16777216-16       	    1708	    781876 ns/op	   32796 B/op	       2 allocs/op
+BenchmarkEngineComparison/simd/size=16777216-16       	    1701	    696884 ns/op	   32796 B/op	       2 allocs/op
+BenchmarkEngineComparison/simd/size=16777216-16       	    1530	    703643 ns/op	   32795 B/op	       2 allocs/op
+BenchmarkEngineComparison/stdlib/size=16777216-16     	    1104	   1138742 ns/op	  128192 B/op	      13 allocs/op
+BenchmarkEngineComparison/stdlib/size=16777216-16     	    1083	   1099165 ns/op	  128192 B/op	      13 allocs/op
+BenchmarkEngineComparison/stdlib/size=16777216-16     	    1084	   1097290 ns/op	  128192 B/op	      13 allocs/op
+PASS
+ok  	jexxor/bytestorm/core	66.422s
