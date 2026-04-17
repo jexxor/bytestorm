@@ -22,6 +22,7 @@ func NewKMPEngine() *KMPEngine {
 }
 
 func (e *KMPEngine) Search(ctx context.Context, data []byte, pattern []byte) ([]int64, error) {
+
 	pLen := len(pattern)
 	dLen := len(data)
 	if pLen == 0 || dLen == 0 || pLen > dLen {
@@ -29,9 +30,7 @@ func (e *KMPEngine) Search(ctx context.Context, data []byte, pattern []byte) ([]
 	}
 
 	lps := e.cache.Get(pattern)
-
-	// TODO: add mem pooling
-	var result []int64 = make([]int64, 0, 32)
+	var result []int64
 
 	i, j := 0, 0
 	for i < dLen {
