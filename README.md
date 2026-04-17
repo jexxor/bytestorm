@@ -2,6 +2,15 @@
 
 Bytestorm is a high-throughput byte-pattern search service for large streams and files. The project combines SIMD acceleration, streaming gRPC transport, and practical observability for production-like workloads.
 
+## TODO
+
+- Check for AVX-512 support and implement an AVX-512 engine for even higher throughput on supported hardware.
+- Research and implement pool alignment (if possible) to prevent false sharing and improve cache performance in the parallel search.
+- Add more detailed logging and error handling in the gRPC service for better observability in production scenarios.
+- Implement benchmarks for the gRPC service layer to measure end-to-end latency and throughput under realistic workloads.
+
+If you want to contribute or have suggestions, feel free to open an issue or submit a pull request! 😊🤗
+
 ## What Was Implemented
 
 - Multi-engine search core:
@@ -110,3 +119,4 @@ python3 scripts/plots/generate_plots.py --engine bench_engine_final.txt --parall
 ## Current Result in One Line
 
 On medium and large payloads, SIMD is clearly faster than stdlib, and constraining parallel workers to GOMAXPROCS=6 improved this host's parallel throughput noticeably.
+
