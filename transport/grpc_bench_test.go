@@ -84,35 +84,27 @@ func benchmarkGRPCStreamSearchNetwork(b *testing.B, chunk []byte, pattern []byte
 	client := api.NewSearchServiceClient(conn)
 	firstChunkReq := &api.LookupRequest{Pattern: pattern, Text: chunk}
 	nextChunkReq := &api.LookupRequest{Text: chunk}
-
-	b.ReportAllocs()
-	b.SetBytes(grpcBenchTotalBytes)
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	runOnce := func() int {
 		requestCtx, requestCancel := context.WithTimeout(context.Background(), grpcBenchRequestTimeout)
 		requestCtx = metadata.NewOutgoingContext(requestCtx, metadata.Pairs(engineHeader, core.SIMDEngineID))
+		defer requestCancel()
 
 		stream, err := client.StreamSearch(requestCtx)
 		if err != nil {
-			requestCancel()
 			b.Fatalf("StreamSearch returned error: %v", err)
 		}
 
 		if err := stream.Send(firstChunkReq); err != nil {
-			requestCancel()
 			b.Fatalf("stream.Send first chunk returned error: %v", err)
 		}
 
 		for chunkIndex := 1; chunkIndex < chunksPerRun; chunkIndex++ {
 			if err := stream.Send(nextChunkReq); err != nil {
-				requestCancel()
 				b.Fatalf("stream.Send chunk %d returned error: %v", chunkIndex, err)
 			}
 		}
 
 		if err := stream.CloseSend(); err != nil {
-			requestCancel()
 			b.Fatalf("stream.CloseSend returned error: %v", err)
 		}
 
@@ -123,13 +115,27 @@ func benchmarkGRPCStreamSearchNetwork(b *testing.B, chunk []byte, pattern []byte
 				break
 			}
 			if err != nil {
-				requestCancel()
 				b.Fatalf("stream.Recv returned error: %v", err)
 			}
 			responseCount++
 		}
 
-		requestCancel()
+		return responseCount
+	}
+
+	b.ReportAllocs()
+	b.SetBytes(grpcBenchTotalBytes)
+
+	// Warmup run primes transport and engine paths before timing starts.
+	warmupCount := runOnce()
+	if warmupCount == 0 {
+		b.Fatal("expected at least one streamed match in warmup")
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		responseCount := runOnce()
 		if responseCount == 0 {
 			b.Fatal("expected at least one streamed match")
 		}
@@ -139,12 +145,7 @@ func benchmarkGRPCStreamSearchNetwork(b *testing.B, chunk []byte, pattern []byte
 func benchmarkLocalSIMDSearch(b *testing.B, chunk []byte, pattern []byte, chunksPerRun int) {
 	engine := core.NewSIMDEngine(0)
 	ctx := context.Background()
-
-	b.ReportAllocs()
-	b.SetBytes(grpcBenchTotalBytes)
-	b.ResetTimer()
-
-	for i := 0; i < b.N; i++ {
+	runOnce := func() int {
 		totalMatches := 0
 		for chunkIndex := 0; chunkIndex < chunksPerRun; chunkIndex++ {
 			matches, err := engine.Search(ctx, chunk, pattern)
@@ -154,6 +155,22 @@ func benchmarkLocalSIMDSearch(b *testing.B, chunk []byte, pattern []byte, chunks
 			totalMatches += len(matches)
 		}
 
+		return totalMatches
+	}
+
+	b.ReportAllocs()
+	b.SetBytes(grpcBenchTotalBytes)
+
+	// Warmup run primes SIMD and memory paths before timing starts.
+	warmupTotal := runOnce()
+	if warmupTotal == 0 {
+		b.Fatal("expected at least one local match in warmup")
+	}
+
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		totalMatches := runOnce()
 		if totalMatches == 0 {
 			b.Fatal("expected at least one local match")
 		}

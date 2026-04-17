@@ -59,7 +59,7 @@ func newSearchService(resultBufferCap int) *core.SearchService {
 		zap.S().Warn("SIMD ENGINE WILL FALLBACK TO SCALAR/KMP MODE. PERFORMANCE MAY DEGRADE.")
 	}
 
-	svc := core.NewSearchService(core.KMPEngineID)
+	svc := core.NewSearchService(core.SIMDEngineID)
 	for _, engine := range []core.Engine{
 		core.NewKMPEngine(),
 		newSIMDEngineForHost(resultBufferCap, simdEnabled),

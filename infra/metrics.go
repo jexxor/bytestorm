@@ -25,6 +25,11 @@ var (
 		Help:    "Latency of SIMD processing per chunk.",
 		Buckets: prometheus.DefBuckets,
 	})
+
+	simdEnabledBool = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "simd_enabled_bool",
+		Help: "Whether SIMD AVX2 path is enabled (1) or disabled/fallback (0).",
+	})
 )
 
 func ObserveSIMDChunk(processedBytes int, matches int, latency time.Duration) {
@@ -50,4 +55,13 @@ func NewMetricsServer(addr string) *http.Server {
 func FlushMetrics() error {
 	_, err := prometheus.DefaultGatherer.Gather()
 	return err
+}
+
+func SetSIMDEnabled(enabled bool) {
+	if enabled {
+		simdEnabledBool.Set(1)
+		return
+	}
+
+	simdEnabledBool.Set(0)
 }
