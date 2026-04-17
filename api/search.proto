@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package bytestorm.api;
+
+option go_package = "jexxor/bytestorm/api;api";
+
+message LookupRequest {
+    bytes pattern = 1;
+    bytes text = 2;
+}
+
+message LookupResponse {
+    int32 index = 1;
+    bool found = 2;
+}
+
+service SearchService {
+    rpc Lookup (LookupRequest) returns (LookupResponse);
+}
