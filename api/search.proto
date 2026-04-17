@@ -10,10 +10,11 @@ message LookupRequest {
 }
 
 message LookupResponse {
-    int32 index = 1;
+    int64 index = 1;
     bool found = 2;
 }
 
 service SearchService {
     rpc Lookup (LookupRequest) returns (LookupResponse);
+    rpc StreamSearch (stream LookupRequest) returns (stream LookupResponse);
 }
