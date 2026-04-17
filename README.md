@@ -119,4 +119,3 @@ python3 scripts/plots/generate_plots.py --engine bench_engine_final.txt --parall
 ## Current Result in One Line
 
 On medium and large payloads, SIMD is clearly faster than stdlib, and constraining parallel workers to GOMAXPROCS=6 improved this host's parallel throughput noticeably.
-
