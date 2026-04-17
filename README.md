@@ -40,6 +40,10 @@ If you want to contribute or have suggestions, feel free to open an issue or sub
   - Fuzz checks for engine consistency
   - Benchmark suite with warmup phase and repeated runs
 
+## TL;DR
+
+On medium and large payloads, SIMD is clearly faster than stdlib, and constraining parallel workers to GOMAXPROCS=6 improved this host's parallel throughput noticeably.
+
 ## Benchmarks
 
 Benchmarks were re-run at the end with fresh data files:
@@ -116,6 +120,3 @@ GOMAXPROCS=6 go test ./core -run '^$' -bench BenchmarkParallelSearch -benchmem -
 python3 scripts/plots/generate_plots.py --engine bench_engine_final.txt --parallel-default bench_parallel_final_default.txt --parallel-pcore6 bench_parallel_final_pcore6.txt --out-dir docs/images
 ```
 
-## TL;DR
-
-On medium and large payloads, SIMD is clearly faster than stdlib, and constraining parallel workers to GOMAXPROCS=6 improved this host's parallel throughput noticeably.
