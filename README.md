@@ -89,15 +89,23 @@ Detailed generated tables:
 
 1. Run benchmarks:
 
+```console
 go test ./core -run '^$' -bench BenchmarkEngineComparison -benchmem -count=3 > bench_engine_final.txt
+```
 
+```console
 go test ./core -run '^$' -bench BenchmarkParallelSearch -benchmem -count=3 > bench_parallel_final_default.txt
+```
 
-GOMAXPROCS=6 go test ./core -run '^$' -bench BenchmarkParallelSearch -benchmem -count=3 > bench_parallel_final_pcore6.txt
+```console
+GOMAXPROCS=6 go test ./core -run '^$' -bench BenchmarkParallelSearch -benchmem -count=3 > bench_parallel_final_pcore6.txt`
+```
 
 2. Generate plots and markdown summaries:
 
+```console
 python3 scripts/plots/generate_plots.py --engine bench_engine_final.txt --parallel-default bench_parallel_final_default.txt --parallel-pcore6 bench_parallel_final_pcore6.txt --out-dir docs/images
+```
 
 ## Current Result in One Line
 
