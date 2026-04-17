@@ -24,14 +24,7 @@ services:
     healthcheck:
       test:
         - CMD-SHELL
-        - >
-          if command -v curl >/dev/null 2>&1; then
-            curl -fsS http://127.0.0.1:8765/ >/dev/null;
-          elif command -v wget >/dev/null 2>&1; then
-            wget -q -O - http://127.0.0.1:8765/ >/dev/null;
-          else
-            exit 1;
-          fi
+        - bash -lc 'echo > /dev/tcp/127.0.0.1/8765'
       interval: 5s
       timeout: 3s
       retries: 20
