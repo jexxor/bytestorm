@@ -2,6 +2,10 @@
 
 // func searchDoubleByteSIMD(data []byte, pattern []byte, out []int32) int
 TEXT ·searchDoubleByteSIMD(SB), NOSPLIT, $0-80
+	// Register roles:
+	// R8=data ptr, R9=data len / last-byte index, R10=pattern ptr, R11=pattern len
+	// DI=out ptr (int32 offsets), R12=out len, AX=matches written
+	// R15=window count (dLen-pLen+1), R14=current window offset
 	MOVQ data_base+0(FP), R8
 	MOVQ data_len+8(FP), R9
 	MOVQ pattern_base+24(FP), R10
@@ -11,6 +15,7 @@ TEXT ·searchDoubleByteSIMD(SB), NOSPLIT, $0-80
 
 	XORQ AX, AX
 
+	// Fast-exit on invalid/empty inputs or no output capacity.
 	TESTQ R9, R9
 	JE done
 	TESTQ R11, R11
@@ -20,6 +25,7 @@ TEXT ·searchDoubleByteSIMD(SB), NOSPLIT, $0-80
 	TESTQ R12, R12
 	JE done
 
+	// Search windows = dLen - pLen + 1.
 	MOVQ R9, R15
 	SUBQ R11, R15
 	INCQ R15
@@ -31,6 +37,7 @@ limitReady:
 	CMPQ R11, $1
 	JE oneByte
 
+	// Reuse R9 as index of the pattern's last byte (pLen-1).
 	MOVQ R11, R9
 	DECQ R9
 
@@ -53,9 +60,11 @@ limitReady:
 	JMP longPattern
 
 shortPattern:
+	// pLen in [2..8]: prefilter by first+last byte, then fixed-width compare.
 	XORQ R14, R14
 
 shortChunkCheck:
+	// Vector loop scans 32 candidate starts per chunk.
 	MOVQ R15, R13
 	SUBQ R14, R13
 	CMPQ R13, $32
@@ -73,6 +82,7 @@ shortChunkCheck:
 	VPMOVMSKB Y2, DX
 
 shortCandLoop:
+	// DX bitmask marks lanes where first and last bytes matched.
 	TESTQ DX, DX
 	JE shortNextChunk
 
@@ -81,6 +91,7 @@ shortCandLoop:
 	ADDQ BX, R13
 	LEAQ (R8)(R13*1), SI
 
+	// Exact verification for each short pattern length.
 	CMPQ R11, $2
 	JE shortVerify2
 	CMPQ R11, $3
@@ -165,6 +176,7 @@ shortVerify8:
 	JNE shortReject
 
 shortStore:
+	// Emit int32 offset and advance output cursor.
 	CMPQ AX, R12
 	JGE done
 	MOVL R13, (DI)
@@ -172,6 +184,7 @@ shortStore:
 	INCQ AX
 
 shortReject:
+	// Clear the lowest set bit and continue with next candidate.
 	LEAQ -1(DX), CX
 	ANDQ CX, DX
 	JMP shortCandLoop
@@ -181,6 +194,7 @@ shortNextChunk:
 	JMP shortChunkCheck
 
 shortTail:
+	// Scalar tail for remaining windows (<32).
 	CMPQ R14, R15
 	JGE done
 
@@ -294,6 +308,7 @@ shortTailNext:
 	JMP done
 
 longPattern:
+	// pLen >= 9: same prefilter, then full compare (qwords + bytes).
 	XORQ R14, R14
 
 longChunkCheck:
@@ -314,6 +329,7 @@ longChunkCheck:
 	VPMOVMSKB Y2, DX
 
 longCandLoop:
+	// Candidate start = R14 + bit-index from mask.
 	TESTQ DX, DX
 	JE longNextChunk
 
@@ -324,6 +340,7 @@ longCandLoop:
 	MOVQ R11, R13
 
 longVerifyQword:
+	// Bulk compare 8 bytes at a time.
 	CMPQ R13, $8
 	JL longVerifyBytes
 	MOVQ (SI), BX
@@ -335,6 +352,7 @@ longVerifyQword:
 	JMP longVerifyQword
 
 longVerifyBytes:
+	// Compare trailing bytes when pLen is not multiple of 8.
 	TESTQ R13, R13
 	JE longStore
 	MOVBLZX (SI), BX
@@ -346,6 +364,7 @@ longVerifyBytes:
 	JMP longVerifyBytes
 
 longStore:
+	// SI advanced by pLen during verify, so start = (SI - data) - pLen.
 	CMPQ AX, R12
 	JGE done
 	MOVQ SI, BX
@@ -356,6 +375,7 @@ longStore:
 	INCQ AX
 
 longReject:
+	// Remove processed candidate bit and keep scanning this chunk.
 	LEAQ -1(DX), CX
 	ANDQ CX, DX
 	JMP longCandLoop
@@ -365,6 +385,7 @@ longNextChunk:
 	JMP longChunkCheck
 
 longTail:
+	// Scalar tail for long-pattern path.
 	CMPQ R14, R15
 	JGE done
 
@@ -419,6 +440,7 @@ longTailNext:
 	JMP done
 
 oneByte:
+	// Special case pLen == 1: only one-byte equality checks.
 	MOVBLZX (R10), BX
 	MOVQ $0x0101010101010101, DX
 	IMULQ BX, DX
@@ -439,6 +461,7 @@ oneByteChunkCheck:
 	VPMOVMSKB Y2, DX
 
 oneByteCandLoop:
+	// Every set bit in DX is a match offset in this 32-byte chunk.
 	TESTQ DX, DX
 	JE oneByteNextChunk
 
@@ -459,6 +482,7 @@ oneByteNextChunk:
 	JMP oneByteChunkCheck
 
 oneByteTail:
+	// Scalar tail for pLen==1.
 	CMPQ R14, R15
 	JGE done
 
@@ -480,6 +504,7 @@ oneByteTailNext:
 	JL oneByteTailLoop
 
 done:
+	// Clear upper YMM state before returning to Go code.
 	VZEROUPPER
 	MOVQ AX, ret+72(FP)
 	RET
