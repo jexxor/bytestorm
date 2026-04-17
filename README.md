@@ -39,15 +39,15 @@ Benchmarks were re-run at the end with fresh data files:
 - bench_parallel_final_default.txt
 - bench_parallel_final_pcore6.txt
 
-### Engine ns/op (horizontal bars)
+### Engine ns/op
 
 ![Engine ns/op](docs/images/engine_nsop_bars.png)
 
-### Engine B/op (horizontal bars)
+### Engine B/op
 
 ![Engine B/op](docs/images/engine_bop_bars.png)
 
-### Engine allocs/op (horizontal bars)
+### Engine allocs/op
 
 ![Engine allocs/op](docs/images/engine_allocs_bars.png)
 
