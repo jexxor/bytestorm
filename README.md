@@ -76,7 +76,7 @@ I used `GOMAXPROCS=6` because I have a laptop with 6 physical cores (12 logical)
 
 ### Engine comparison (avg)
 
-| Size | SIMD GB/s | Stdlib GB/s | SIMD vs Stdlib |
+| Size | SIMD GiB/s | Stdlib GiB/s | SIMD vs Stdlib |
 | --- | ---: | ---: | ---: |
 | 4KB | 20.010 | 20.247 | -1.17% |
 | 64KB | 25.630 | 18.311 | +39.97% |
@@ -85,7 +85,7 @@ I used `GOMAXPROCS=6` because I have a laptop with 6 physical cores (12 logical)
 
 ### ParallelSearch comparison (avg)
 
-| Mode | ns/op | MB/s | B/op | allocs/op |
+| Mode | ns/op | MiB/s | B/op | allocs/op |
 | --- | ---: | ---: | ---: | ---: |
 | default | 3858803.0 | 17722.34 | 2647102.7 | 130.00 |
 | gomaxprocs=6 | 3132616.7 | 21431.14 | 2634507.7 | 130.33 |
