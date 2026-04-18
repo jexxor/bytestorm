@@ -8,6 +8,7 @@ Bytestorm is a high-throughput byte-pattern search service for large streams and
 - Research and implement pool alignment (if possible) to prevent false sharing and improve cache performance in the parallel search.
 - Add more detailed logging and error handling in the gRPC service for better observability in production scenarios.
 - Implement benchmarks for the gRPC service layer to measure end-to-end latency and throughput under realistic workloads.
+- More on deployment & check if scales well horizontally
 
 If you want to contribute or have suggestions, feel free to open an issue or submit a pull request! 😊🤗
 
