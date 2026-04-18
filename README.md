@@ -44,10 +44,6 @@ If you want to contribute or have suggestions, feel free to open an issue or sub
 
 On medium and large payloads, SIMD is clearly faster than stdlib, and constraining parallel workers to GOMAXPROCS=6 improved this host's parallel throughput noticeably.
 
-### Important notice
-
-I used `GOMAXPROCS=6` because I have a laptop with 6 physical cores (12 logical). Setting `GOMAXPROCS` to the number of physical cores often yields better performance for CPU-bound workloads due to reduced context switching and better cache utilization. 
-
 ## Benchmarks
 
 Benchmarks were re-run at the end with fresh data files:
@@ -55,6 +51,10 @@ Benchmarks were re-run at the end with fresh data files:
 - [bench_engine_final.txt](docs/bench_results/bench_engine_final.txt)
 - [bench_parallel_final_default.txt](docs/bench_results/bench_parallel_final_default.txt)
 - [bench_parallel_final_pcore6.txt](docs/bench_results/bench_parallel_final_pcore6.txt)
+
+### Important notice
+
+I used `GOMAXPROCS=6` because I have a laptop with 6 physical cores (12 logical). Setting `GOMAXPROCS` to the number of physical cores often yields better performance for CPU-bound workloads due to reduced context switching and better cache utilization. 
 
 ### Engine ns/op
 
